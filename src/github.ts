@@ -418,6 +418,78 @@ export class GitHub {
     }));
   }
 
+  /**
+   * A file's contents at a commit, or `undefined` if there are none to get.
+   *
+   * `undefined` covers every ordinary reason a changed file has no readable
+   * content at the head commit: it was deleted, it is binary, or it is past the
+   * 1 MB the contents API will inline. All three are normal in a pull request
+   * and none of them should cost the review, so the caller falls back to the
+   * diff alone rather than failing.
+   */
+  async fileContent(
+    owner: string,
+    repo: string,
+    path: string,
+    ref: string,
+  ): Promise<string | undefined> {
+    try {
+      const data = await this.rest<{
+        content?: string;
+        encoding?: string;
+        type?: string;
+      }>(
+        `/repos/${owner}/${repo}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${ref}`,
+      );
+      if (data.type !== 'file' || data.encoding !== 'base64') return undefined;
+      if (data.content === undefined) return undefined;
+
+      const text = Buffer.from(data.content, 'base64').toString('utf8');
+      // A binary file the API happened to inline. A NUL byte in the first few
+      // kilobytes is the cheap test, and a source file never has one.
+      return text.slice(0, 8_000).includes('\u0000') ? undefined : text;
+    } catch (error) {
+      log.debug(`No contents for ${path} at ${ref.slice(0, 7)}.`, error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Every path in the repository at a commit, for resolving imports and finding
+   * a file's tests without guessing at names and probing the API for each one.
+   *
+   * One request. The tree endpoint truncates very large repositories, and a
+   * truncated tree is still useful here: a path that is missing from it simply
+   * does not get pulled in as context, which costs the review a little breadth
+   * rather than correctness.
+   */
+  async tree(
+    owner: string,
+    repo: string,
+    ref: string,
+  ): Promise<ReadonlySet<string>> {
+    try {
+      const data = await this.rest<{
+        tree?: readonly { path: string; type: string }[];
+        truncated?: boolean;
+      }>(`/repos/${owner}/${repo}/git/trees/${ref}?recursive=1`);
+
+      if (data.truncated === true) {
+        log.debug(
+          'The repository tree was truncated; some context may be missing.',
+        );
+      }
+      return new Set(
+        (data.tree ?? [])
+          .filter((entry) => entry.type === 'blob')
+          .map((entry) => entry.path),
+      );
+    } catch (error) {
+      log.debug('Could not read the repository tree.', error);
+      return new Set();
+    }
+  }
+
   async submitReview(
     owner: string,
     repo: string,

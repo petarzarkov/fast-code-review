@@ -34,6 +34,11 @@ export interface Config {
   readonly replies: boolean;
   /** What counts as being addressed. Defaults to the bot's own `@login`. */
   readonly triggerPhrase: string | undefined;
+  /** Show each changed file's real contents, not just GitHub's 3-line patch. */
+  readonly fullContext: boolean;
+  /** Also show a changed file's tests and the local files it imports. */
+  readonly relatedFiles: boolean;
+  readonly maxFileLines: number;
 }
 
 export const input = (name: string): string =>
@@ -118,5 +123,8 @@ export const loadConfig = (): Config => {
     approve: flag('approve', true),
     replies: flag('reply_to_threads', true),
     triggerPhrase: optional('trigger_phrase'),
+    fullContext: flag('full_context', true),
+    relatedFiles: flag('related_files', true),
+    maxFileLines: number('max_file_lines', 600),
   };
 };

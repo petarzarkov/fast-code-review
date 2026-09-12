@@ -168,6 +168,30 @@ least reliable way to get a number that is already on the row. Any finding whose
 line is not in the diff is summarised in the body instead, because GitHub rejects
 the *entire* review if one comment names an uncommentable line.
 
+**Context.** GitHub's patch carries three lines either side of a hunk, which is
+enough to see that a line changed and not enough to say whether the change is
+wrong. Both failure directions come from that: a bug that needs the rest of the
+function goes unreported, and a finding about code the model cannot see gets
+reported confidently anyway.
+
+So each changed file is fetched at the head commit and shown whole, with the
+change marked inside it, and its test file and local imports go alongside it as
+background:
+
+```
+   41   | export const page = (rows, opts) => {
+   42 = |   const limit = opts.limit;
+   43 + |   return rows.slice(0, limit + 1);
+     - |   return rows.slice(0, limit);
+   44   | };
+```
+
+`+` is added and `=` is unchanged-but-in-the-diff; both can carry a comment. A
+blank marker is the rest of the file, there to be read and not to be anchored
+to. Files past `max_file_lines` are sent as wide windows around each hunk
+instead. Turn the whole thing off with `full_context: false` to send patches
+alone.
+
 **Approving.** The review approves only when the model returned a structured,
 empty findings list *and* did not ask for a comment. Both signals have to agree:
 a model that lists five findings and then says "approve" does not get one, and
@@ -211,6 +235,9 @@ diff, and an argument costs more of your attention than the finding was worth.
 | `approve` | `true` | allow submitting `APPROVE` |
 | `reply_to_threads` | `true` | answer replies to its own comments |
 | `trigger_phrase` | its own `@login` | what counts as being addressed |
+| `full_context` | `true` | show whole changed files, not just GitHub's 3-line patch |
+| `related_files` | `true` | also show each file's tests and local imports |
+| `max_file_lines` | `600` | longest file shown whole; past it, windows around the hunks |
 | `max_comments` | `20` | inline cap; the rest are listed in the body, worst kept first |
 | `batch_tokens` | `60000` | per-call budget; lower it for small context windows |
 | `language` | model's own | e.g. `Bulgarian` |

@@ -10,12 +10,17 @@
 import { ask } from './ai.ts';
 import type { Config } from './config.ts';
 import {
-  batchFiles,
   commentableLines,
   type DiffFile,
+  estimateTokens,
   parseFiles,
-  renderFile,
 } from './diff.ts';
+import {
+  gather,
+  type GatheredFile,
+  renderReference,
+  renderWithContext,
+} from './context.ts';
 import { excluded } from './filter.ts';
 import { type Finding, isStructured, parseVerdict } from './findings.ts';
 import type { GitHub, PullRequest, ReviewThread } from './github.ts';
@@ -125,7 +130,43 @@ export const runReview = async (
   };
   const system = reviewSystemPrompt(promptInput);
 
-  const batches = batchFiles(files, config.batchTokens);
+  /**
+   * The contents behind the diff, so the change is judged against the code
+   * rather than against three lines of patch context either side of it.
+   */
+  const context = config.fullContext
+    ? await gather(github, pr.owner, pr.repo, pr.headSha, files, {
+        related: config.relatedFiles,
+        relatedPerFile: 3,
+        maxReferences: 12,
+      })
+    : {
+        changed: files.map((file) => ({ file, content: undefined })),
+        references: new Map<string, string>(),
+      };
+
+  const render = (entry: GatheredFile): string =>
+    renderWithContext(entry.file, entry.content, {
+      maxFileLines: config.maxFileLines,
+      window: 45,
+    });
+
+  /**
+   * Batched on rendered size rather than on the patch, because the rendering is
+   * what is actually sent. A whole file is many times its patch, so batching the
+   * patch and expanding it afterwards is how a context window gets overrun.
+   */
+  const batches = batchRendered(context.changed, render, config.batchTokens);
+
+  /**
+   * References ride with the first batch only. They are background for judging
+   * the change, and repeating a dozen files across every batch spends the budget
+   * on the same bytes instead of on more of the diff.
+   */
+  const referenceBlock = [...context.references]
+    .map(([path, content]) => renderReference(path, content, 300))
+    .join('\n\n');
+
   log.info(`Sending ${files.length} file(s) in ${batches.length} batch(es).`);
 
   const findings: Finding[] = [];
@@ -145,7 +186,12 @@ export const runReview = async (
               role: 'user',
               content: reviewUserPrompt({
                 ...promptInput,
-                diff: batch.map(renderFile).join('\n\n'),
+                diff: [
+                  ...batch.map(render),
+                  ...(index === 0 && referenceBlock !== ''
+                    ? [referenceBlock]
+                    : []),
+                ].join('\n\n'),
               }),
             },
           ],
@@ -205,4 +251,37 @@ export const runReview = async (
     `${event.toLowerCase()}: ${review.comments.length} inline, ` +
       `${review.carried} carried, ${review.duplicates} already open.`,
   );
+};
+
+/**
+ * Groups rendered files so no group is likely to overrun a context window.
+ *
+ * A file larger than the budget still goes out on its own rather than being
+ * dropped or truncated: a model with a smaller window refuses that one request,
+ * the router deranks, and the rest of the review still happens. Silently
+ * reviewing half of a large file would not announce itself.
+ */
+const batchRendered = (
+  entries: readonly GatheredFile[],
+  render: (entry: GatheredFile) => string,
+  budgetTokens: number,
+): readonly (readonly GatheredFile[])[] => {
+  const batches: GatheredFile[][] = [];
+  let current: GatheredFile[] = [];
+  let used = 0;
+
+  for (const entry of entries) {
+    if (entry.file.hunks.length === 0) continue;
+    const cost = estimateTokens(render(entry));
+    if (current.length > 0 && used + cost > budgetTokens) {
+      batches.push(current);
+      current = [];
+      used = 0;
+    }
+    current.push(entry);
+    used += cost;
+  }
+
+  if (current.length > 0) batches.push(current);
+  return batches;
 };

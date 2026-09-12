@@ -49,18 +49,35 @@ Do not report:
 An empty findings array is the correct answer for most diffs. Returning one is
 not a failure to review; padding the array to look thorough is.`;
 
-const ANCHORING = `Every line in the diff is printed with its line number in the
-file on the left. Cite that number in \`line\`, copied from the row you are
-commenting on. Never count rows yourself and never cite a line that has no number
-printed next to it - those are deletions, which cannot be commented on.
+const ANCHORING = `Each file is printed with its line number on the left and a
+marker beside it:
 
-If a finding is about a line not shown in the diff, still report it with the file
-and your best line number. It will be summarised rather than posted inline.`;
+    42 + | a line this change added
+    43 = | a line the diff shows unchanged, for context
+    44   | a line of the file, not part of this change
+       - | a line this change deleted
+
+Cite the printed number in \`line\`, copied from the row. Never count rows.
+
+**Only lines marked \`+\` or \`=\` can carry a comment.** A line marked \`-\` was
+deleted and a line with no marker is not in this change. Both are there for you
+to read. If a finding is genuinely about one of them, report it anyway with your
+best line number and it will be summarised instead of posted inline.
+
+Files headed "not changed, for reference" are background. Read them to judge the
+change; do not report findings in them.`;
 
 export const reviewSystemPrompt = (input: ReviewPromptInput): string =>
   [
-    'You are reviewing a pull request diff. You are a careful engineer who has',
-    'read this codebase, not a linter.',
+    'You are reviewing a change to a codebase. You are a careful engineer who',
+    'has read it, not a linter.',
+    '',
+    'You are shown each changed file as it stands after the change, with the',
+    'change marked inside it, and where they were found the tests and the local',
+    'files it imports. So judge the change against the code around it: whether',
+    'the caller can pass what the new branch cannot handle, whether a helper',
+    'that already exists does this, whether the test still describes what the',
+    'code now does.',
     '',
     THRESHOLD,
     '',

@@ -77,6 +77,31 @@ inputs:
       subscribing to issue_comment safe.
     required: false
 
+  full_context:
+    description: >
+      Show the reviewer each changed file as it stands after the change, with
+      the diff marked inside it, instead of only GitHub's patch. GitHub's patch
+      carries three lines of context either side of a hunk, which is enough to
+      see that a line changed and not enough to say whether the change is
+      wrong. Turn off to send patches alone, which is cheaper in tokens.
+    required: false
+    default: 'true'
+
+  related_files:
+    description: >
+      Alongside each changed file, also show its test file and the local files
+      it imports, as read-only background. Needs full_context.
+    required: false
+    default: 'true'
+
+  max_file_lines:
+    description: >
+      Longest file shown whole. Past this only the changed regions are sent,
+      with a wide window either side. Lower it for models with small context
+      windows.
+    required: false
+    default: '600'
+
   max_comments:
     description: 'Most inline comments one review may post. The rest are listed in the body, worst kept first.'
     required: false
@@ -123,6 +148,9 @@ runs:
         INPUT_APPROVE: ${{ inputs.approve }}
         INPUT_REPLY_TO_THREADS: ${{ inputs.reply_to_threads }}
         INPUT_TRIGGER_PHRASE: ${{ inputs.trigger_phrase }}
+        INPUT_FULL_CONTEXT: ${{ inputs.full_context }}
+        INPUT_RELATED_FILES: ${{ inputs.related_files }}
+        INPUT_MAX_FILE_LINES: ${{ inputs.max_file_lines }}
         INPUT_MAX_COMMENTS: ${{ inputs.max_comments }}
         INPUT_BATCH_TOKENS: ${{ inputs.batch_tokens }}
         INPUT_LANGUAGE: ${{ inputs.language }}
