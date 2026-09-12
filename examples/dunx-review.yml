@@ -1,0 +1,94 @@
+# Drop-in replacement for dunx's `dunxonu review` + `dunxonu` workflows.
+#
+# Copy to .github/workflows/ in the dunx repo. It replaces both files: this
+# action handles the review and the thread replies from one `uses:` block,
+# because which flow runs is decided by the webhook payload rather than by an
+# input.
+#
+# What it changes relative to the claude-code-action setup:
+#
+#   - No CLAUDE_CODE_OAUTH_TOKEN. The review runs on whatever free tiers the
+#     `routes` list names, and deranks through every key of every one of them
+#     before it gives up.
+#   - No checkout, no scripts/post-review.ts, no execution file to parse. The
+#     anchoring, the verdict, the scope narrowing and the carried-findings note
+#     are inside the action, and tested there.
+#   - Thread replies are the same job rather than a second workflow with its own
+#     "is dunxonu being addressed" shell step.
+#
+# DUNXONU_TOKEN is the existing secret and keeps its meaning: the review and the
+# replies post as that account.
+
+name: dunxonu review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_review_comment:
+    types: [created]
+
+# A push supersedes the review of the commit before it, so a rapid series of
+# pushes costs one review rather than one per push.
+concurrency:
+  group: dunxonu-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+# Nothing at the workflow level, so a job that forgets its own block gets none
+# rather than the repository default.
+permissions: {}
+
+jobs:
+  review:
+    name: Review the diff
+    runs-on: ubuntu-latest
+    # The loop guard, and it is load bearing: dunxonu posts with a real user's
+    # token, so its own reviews and replies raise these events. A comment posted
+    # with GITHUB_TOKEN would not.
+    if: >-
+      github.event.sender.login != 'dunxonu' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # No actions/checkout. The action reads the diff through the API and never
+      # touches the working tree, so there is no token left in .git/config for a
+      # prompt injection in an attacker-controlled pull request to read out.
+      - uses: petarzarkov/fast-code-review@v1
+        with:
+          github_token: ${{ secrets.DUNXONU_TOKEN }}
+
+          # Best first. Every key of a route is spent before the next route is
+          # reached, so the free tiers are exhausted at the top of the list
+          # rather than spread across it.
+          routes: |
+            openrouter/deepseek/deepseek-chat-v3.1:free
+            openrouter/qwen/qwen3-coder:free
+            openrouter/z-ai/glm-4.5-air:free
+            groq/llama-3.3-70b-versatile
+            groq/qwen/qwen3-32b
+            google/gemini-2.5-flash
+            google/gemini-2.5-flash-lite
+            cerebras/llama-3.3-70b
+
+          exclude: '*.md,*.lock,bun.lock,CHANGELOG.md,coverage/**,dist/**,docs/**,**/templates/**,**/__snapshots__/**,*.snap,*.svg,*.png'
+
+          # dunx's CLAUDE.md is 61k and cannot go in a prompt. This is the part
+          # of it a reviewer working from a diff cannot infer.
+          instructions: |
+            This repository bans `enum`. Flag any that appear; the replacement is
+            a frozen object plus an indexed-access union.
+            Do not prefix identifiers with "Dunx" - the brand belongs in the
+            package name. Flag any that do.
+            `packages/*/src/index.ts` is the published API surface. Flag a
+            breaking change to an export there.
+            Do not flag missing tests in `examples/` or `internal/`.
+            Do not flag comment style or wording.
+        env:
+          # One secret holding a comma-separated list, so adding a key is editing
+          # one secret rather than adding another to the workflow file.
+          OPENROUTER_API_KEYS: ${{ secrets.OPENROUTER_API_KEYS }}
+          GROQ_API_KEYS: ${{ secrets.GROQ_API_KEYS }}
+          GEMINI_API_KEYS: ${{ secrets.GEMINI_API_KEYS }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}

@@ -2,13 +2,14 @@
   "name": "fast-code-review",
   "version": "0.0.0",
   "private": true,
-  "description": "The fast-code-review monorepo",
+  "description": "AI code review GitHub Action over any OpenAI-compatible provider, deranking across keys and models.",
   "keywords": [
     "action",
-    "code",
-    "fast",
-    "fast-code-review",
-    "review"
+    "ai",
+    "code-review",
+    "github-action",
+    "openrouter",
+    "pull-request"
   ],
   "homepage": "https://github.com/petarzarkov/fast-code-review#readme",
   "license": "MIT",
@@ -24,15 +25,14 @@
   "type": "module",
   "scripts": {
     "install:clean": "find . -name node_modules -type d -prune -exec rm -rf {} + && rm -f bun.lock && bun install",
-    "build": "bun scripts/build-all.ts",
-    "ci": "bun ./scripts/ci.ts",
-    "test": "bun run test",
-    "test:cov": "bun test --coverage && bun run gen:cov",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "bun test",
+    "test:cov": "bun test --coverage",
     "lint": "oxlint --fix .",
     "lint:check": "oxlint --max-warnings 0 .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
-    "typecheck": "bun run --parallel --filter '*' typecheck"
+    "ci": "bun run format:check && bun run lint:check && bun run typecheck && bun test"
   },
   "devDependencies": {
     "@stagelint/stagelint": "0.1.4",

@@ -5,6 +5,7 @@
     "module": "nodenext" /* Real ESM package semantics: validates the exports map and forces explicit import extensions. */,
     "moduleResolution": "nodenext" /* Resolve the way a published-package consumer will, not the way a bundler would. */,
     "resolveJsonModule": true /* Allow importing .json files. */,
+    "allowImportingTsExtensions": true /* Bun runs this source directly, so imports carry the real .ts extension. Safe with noEmit. */,
     "types": ["node", "bun"],
     "strict": true /* Enable all strict type-checking options. */,
     "alwaysStrict": true /* Ensure 'use strict' is always parsed. */,

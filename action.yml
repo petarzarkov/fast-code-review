@@ -1,0 +1,108 @@
+name: 'Fast Code Review'
+description: 'AI code review on pull requests through any OpenAI-compatible provider, deranking across keys so a spent free tier never stops the review.'
+author: 'Petar Zarkov'
+
+branding:
+  icon: 'git-pull-request'
+  color: 'purple'
+
+inputs:
+  routes:
+    description: |
+      Ordered list of `<provider>/<model>`, one per line, best first. Each is
+      tried with every key configured for its provider before the next is
+      reached, so a spent free tier deranks rather than failing the run.
+
+      Built-in providers: openrouter, groq, google, openai, anthropic, deepseek,
+      mistral, together, cerebras, xai, fireworks, nvidia, sambanova, ollama.
+      Any other name works too if `<NAME>_BASE_URL` is set in the job env.
+
+      Keys come from the job env, never from an input: `<PROVIDER>_API_KEY`, or
+      `<PROVIDER>_API_KEY_1` / `_2` / ... for several, or `<PROVIDER>_API_KEYS`
+      holding a comma-separated list in one secret.
+    required: false
+    default: |
+      openrouter/deepseek/deepseek-chat-v3.1:free
+      groq/llama-3.3-70b-versatile
+      google/gemini-2.5-flash
+
+  github_token:
+    description: >
+      Token used to read the pull request and post the review. Pass a personal
+      access token belonging to a bot account to have the review appear as that
+      account; otherwise the workflow's own GITHUB_TOKEN is used, and reviews
+      appear as github-actions[bot].
+    required: false
+
+  exclude:
+    description: >
+      Comma-separated glob patterns for files the review never sees. A pattern
+      with no slash matches on the basename, so `*.md` means any markdown file.
+    required: false
+    default: '*.md,*.lock,*.lockb,package-lock.json,pnpm-lock.yaml,yarn.lock,bun.lock,dist/**,build/**,vendor/**,**/__snapshots__/**,*.snap,*.min.js,*.map,*.svg,*.png,*.jpg,*.ico'
+
+  skip_draft_prs:
+    description: 'Skip review while a pull request is a draft. Pair with the ready_for_review trigger.'
+    required: false
+    default: 'true'
+
+  approve:
+    description: >
+      Allow the action to submit APPROVE when it finds nothing. Turn off in a
+      repository where an approval would satisfy a required-reviewer rule.
+    required: false
+    default: 'true'
+
+  reply_to_threads:
+    description: "Answer replies to the action's own review comments."
+    required: false
+    default: 'true'
+
+  max_comments:
+    description: 'Most inline comments one review may post. The rest are listed in the body, worst kept first.'
+    required: false
+    default: '20'
+
+  batch_tokens:
+    description: 'Rough token budget per model call. Lower it for models with small context windows.'
+    required: false
+    default: '60000'
+
+  language:
+    description: "Language for the review prose, e.g. English, Spanish, Bulgarian. Defaults to the model's own."
+    required: false
+
+  instructions:
+    description: 'Repository-specific review instructions, appended to the system prompt and taking precedence over the defaults.'
+    required: false
+
+  bun_version:
+    description: 'Bun version used to run the action.'
+    required: false
+    default: '1.4.1'
+
+runs:
+  using: 'composite'
+  steps:
+    # The action has no dependencies at all - GitHub's REST and GraphQL APIs and
+    # the model calls all go through fetch - so there is no install step here and
+    # no lockfile in the runtime path. setup-bun then run is the whole of it.
+    - name: Set up Bun
+      uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2
+      with:
+        bun-version: ${{ inputs.bun_version }}
+
+    - name: Review
+      shell: bash
+      run: bun run "${{ github.action_path }}/src/main.ts"
+      env:
+        INPUT_ROUTES: ${{ inputs.routes }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github_token }}
+        INPUT_EXCLUDE: ${{ inputs.exclude }}
+        INPUT_SKIP_DRAFT_PRS: ${{ inputs.skip_draft_prs }}
+        INPUT_APPROVE: ${{ inputs.approve }}
+        INPUT_REPLY_TO_THREADS: ${{ inputs.reply_to_threads }}
+        INPUT_MAX_COMMENTS: ${{ inputs.max_comments }}
+        INPUT_BATCH_TOKENS: ${{ inputs.batch_tokens }}
+        INPUT_LANGUAGE: ${{ inputs.language }}
+        INPUT_INSTRUCTIONS: ${{ inputs.instructions }}
