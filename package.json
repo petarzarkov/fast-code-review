@@ -3,6 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "description": "The fast-code-review monorepo",
+  "keywords": [
+    "action",
+    "code",
+    "fast",
+    "fast-code-review",
+    "review"
+  ],
   "homepage": "https://github.com/petarzarkov/fast-code-review#readme",
   "license": "MIT",
   "author": {
@@ -16,7 +23,6 @@
   },
   "type": "module",
   "scripts": {
-    "prepare": "bun scripts/install-hooks.ts",
     "install:clean": "find . -name node_modules -type d -prune -exec rm -rf {} + && rm -f bun.lock && bun install",
     "build": "bun scripts/build-all.ts",
     "ci": "bun ./scripts/ci.ts",

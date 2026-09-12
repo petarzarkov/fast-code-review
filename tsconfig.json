@@ -34,5 +34,5 @@
     "sourceMap": false,
     "declaration": false
   },
-  "include": ["scripts"]
+  "include": ["src"]
 }
