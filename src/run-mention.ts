@@ -15,7 +15,7 @@ import { ask } from './ai.ts';
 import type { Config } from './config.ts';
 import { batchFiles, parseFiles, renderFile } from './diff.ts';
 import { excluded } from './filter.ts';
-import type { GitHub, IssueComment } from './github.ts';
+import type { GitHub, IssueComment, ReviewThread } from './github.ts';
 import { log } from './log.ts';
 import { mentionSystemPrompt, mentionUserPrompt } from './prompts.ts';
 
@@ -44,17 +44,46 @@ const renderConversation = (
   openingBody: string,
   comments: readonly IssueComment[],
   mine: string,
+  thread: ReviewThread | undefined,
+  asked: string,
 ): string => {
   const who = (author: string): string =>
     author === mine ? `${author} (you)` : author;
 
-  return [
+  const lines = [
     `**${who(openingAuthor)}** opened it:`,
     openingBody === '' ? '_No description._' : openingBody,
     ...comments.map(
       (comment) => `\n**${who(comment.author)}:**\n${comment.body}`,
     ),
-  ].join('\n');
+  ];
+
+  if (thread !== undefined) {
+    const where = `${thread.path}${thread.line === null ? '' : `:${thread.line}`}`;
+    lines.push(
+      `\n---\n\nThe mention is in a review thread on ${where}, about this code:`,
+      '\n```diff',
+      thread.comments[0]?.diffHunk ?? '(no longer available)',
+      '```',
+      '\nThe thread, oldest first:',
+      ...thread.comments.map(
+        (comment) => `\n**${who(comment.author)}:**\n${comment.body}`,
+      ),
+    );
+  }
+
+  /**
+   * Restated last and labelled, rather than left to be found.
+   *
+   * It is already above, once the thread is included, but which of a dozen
+   * comments is the live question is exactly what a model gets wrong when the
+   * conversation is long - and the answer to the wrong one still reads fluent.
+   */
+  lines.push(
+    `\n---\n\n**This is the message that mentioned you. Answer it:**\n${asked}`,
+  );
+
+  return lines.join('\n');
 };
 
 /**
@@ -107,6 +136,25 @@ export const runMention = async (
   const issue = await github.issue(owner, repo, event.number);
   const comments = await github.issueComments(owner, repo, event.number);
 
+  /**
+   * The review thread the mention arrived in, when it arrived in one.
+   *
+   * `/issues/{n}/comments` returns **only** top-level conversation comments.
+   * Review comments are a separate resource, so a mention left on a line of the
+   * diff appeared nowhere in the context gathered above: the model was handed a
+   * pull request and a diff, with no question anywhere in it, and did the only
+   * thing that made sense with that - it reviewed the diff. Twice, on two
+   * different models, which is what made it look like a prompt problem.
+   */
+  const thread =
+    event.replyToCommentId === undefined
+      ? undefined
+      : (await github.threads(owner, repo, event.number)).find((candidate) =>
+          candidate.comments.some(
+            (comment) => comment.id === event.replyToCommentId,
+          ),
+        );
+
   const diff = issue.isPullRequest
     ? await diffFor(github, config, owner, repo, event.number)
     : undefined;
@@ -114,7 +162,14 @@ export const runMention = async (
   const promptInput = {
     subject: issue.title,
     kind: issue.isPullRequest ? ('pull request' as const) : ('issue' as const),
-    conversation: renderConversation(issue.author, issue.body, comments, mine),
+    conversation: renderConversation(
+      issue.author,
+      issue.body,
+      comments,
+      mine,
+      thread,
+      event.body,
+    ),
     diff,
     language: config.language,
     instructions: config.instructions,
