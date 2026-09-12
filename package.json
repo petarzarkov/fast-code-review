@@ -1,0 +1,40 @@
+{
+  "name": "fast-code-review",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The fast-code-review monorepo",
+  "homepage": "https://github.com/petarzarkov/fast-code-review#readme",
+  "license": "MIT",
+  "author": {
+    "name": "Petar Zarkov",
+    "email": "pzarko1@gmail.com",
+    "url": "https://github.com/petarzarkov"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/petarzarkov/fast-code-review"
+  },
+  "type": "module",
+  "scripts": {
+    "prepare": "bun scripts/install-hooks.ts",
+    "install:clean": "find . -name node_modules -type d -prune -exec rm -rf {} + && rm -f bun.lock && bun install",
+    "build": "bun scripts/build-all.ts",
+    "ci": "bun ./scripts/ci.ts",
+    "test": "bun run test",
+    "test:cov": "bun test --coverage && bun run gen:cov",
+    "lint": "oxlint --fix .",
+    "lint:check": "oxlint --max-warnings 0 .",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "typecheck": "bun run --parallel --filter '*' typecheck"
+  },
+  "devDependencies": {
+    "@stagelint/stagelint": "0.1.4",
+    "@types/bun": "1.4.1",
+    "@types/node": "26.4.1",
+    "oxfmt": "0.66.0",
+    "oxlint": "1.81.0",
+    "oxlint-tsgolint": "7.0.2001",
+    "typescript": "7.0.2"
+  }
+}
