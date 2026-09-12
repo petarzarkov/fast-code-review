@@ -176,6 +176,11 @@ export const mentionSystemPrompt = (input: MentionPromptInput): string =>
     `You were mentioned in a comment on a ${input.kind}. Answer the person who`,
     'mentioned you.',
     '',
+    'You are not reviewing this change. Do not list findings, do not summarise',
+    'what the diff does, and do not say whether it looks correct unless that is',
+    'what you were asked. The last message in the conversation is the question.',
+    'Answer that question and nothing else.',
+    '',
     'What you can see is below: the conversation, and for a pull request the',
     'diff. You cannot read the rest of the repository, run commands, execute',
     'tests, or change any file. If answering properly needs something outside',
@@ -194,9 +199,24 @@ export const mentionSystemPrompt = (input: MentionPromptInput): string =>
     ...(input.language === undefined
       ? []
       : ['', `Write the answer in ${input.language}.`]),
+    /**
+     * Background, and labelled as background.
+     *
+     * The same `instructions` input feeds the review prompt, where it is a list
+     * of things to flag in a diff. Pasted under a neutral heading it reads as a
+     * task: asked a direct question on a pull request, a model given this
+     * answered with a four-line code review of the diff and never addressed the
+     * question at all.
+     */
     ...(input.instructions === undefined
       ? []
-      : ['', 'Repository-specific context:', input.instructions]),
+      : [
+          '',
+          'Background on this repository, for context only. It is not a task:',
+          'do not go looking for violations of it, and do not mention it unless',
+          'it bears on the question you were asked.',
+          input.instructions,
+        ]),
   ].join('\n');
 
 export const mentionUserPrompt = (input: MentionPromptInput): string =>
