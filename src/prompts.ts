@@ -214,7 +214,8 @@ export const mentionSystemPrompt = (input: MentionPromptInput): string =>
           '',
           'Background on this repository, for context only. It is not a task:',
           'do not go looking for violations of it, and do not mention it unless',
-          'it bears on the question you were asked.',
+          'it bears on the question you were asked. Where it says how to write',
+          'rather than what the code must do, that part binds your own reply.',
           input.instructions,
         ]),
   ].join('\n');
