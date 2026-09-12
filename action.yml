@@ -58,6 +58,14 @@ inputs:
     required: false
     default: 'true'
 
+  trigger_phrase:
+    description: >
+      What counts as being addressed in a comment, a review, or a review
+      thread. Defaults to the posting account's own @login, so it usually needs
+      no setting. A comment not containing it is ignored, which is what makes
+      subscribing to issue_comment safe.
+    required: false
+
   max_comments:
     description: 'Most inline comments one review may post. The rest are listed in the body, worst kept first.'
     required: false
@@ -102,6 +110,7 @@ runs:
         INPUT_SKIP_DRAFT_PRS: ${{ inputs.skip_draft_prs }}
         INPUT_APPROVE: ${{ inputs.approve }}
         INPUT_REPLY_TO_THREADS: ${{ inputs.reply_to_threads }}
+        INPUT_TRIGGER_PHRASE: ${{ inputs.trigger_phrase }}
         INPUT_MAX_COMMENTS: ${{ inputs.max_comments }}
         INPUT_BATCH_TOKENS: ${{ inputs.batch_tokens }}
         INPUT_LANGUAGE: ${{ inputs.language }}

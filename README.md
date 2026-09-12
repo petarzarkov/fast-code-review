@@ -5,7 +5,8 @@ deranking across keys and models so a spent free tier never stops the review.
 
 One review per push: findings land as inline comments on the lines they are
 about, the body stays a summary, and the review approves when there is nothing
-to say.
+to say. Reply to one of its comments and it answers. Name it in any comment,
+on a pull request or an issue, and it answers that too.
 
 ```yaml
 - uses: petarzarkov/fast-code-review@v1
@@ -75,10 +76,16 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
   pull_request_review_comment:
     types: [created]
+  issue_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
 
+# Keyed by event, so a comment arriving mid-review does not cancel the review.
+# Only a push supersedes: two people commenting is two questions.
 concurrency:
-  group: review-${{ github.event.pull_request.number || github.event.issue.number }}
-  cancel-in-progress: true
+  group: review-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions: {}
 
@@ -89,6 +96,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      issues: write
     steps:
       - uses: petarzarkov/fast-code-review@v1
         with:
@@ -178,6 +186,7 @@ diff, and an argument costs more of your attention than the finding was worth.
 | `skip_draft_prs` | `true` | |
 | `approve` | `true` | allow submitting `APPROVE` |
 | `reply_to_threads` | `true` | answer replies to its own comments |
+| `trigger_phrase` | its own `@login` | what counts as being addressed |
 | `max_comments` | `20` | inline cap; the rest are listed in the body, worst kept first |
 | `batch_tokens` | `60000` | per-call budget; lower it for small context windows |
 | `language` | model's own | e.g. `Bulgarian` |

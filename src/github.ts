@@ -58,6 +58,23 @@ export interface ThreadComment {
   readonly diffHunk: string;
 }
 
+/** An issue or a pull request conversation, which share one REST resource. */
+export interface Issue {
+  readonly number: number;
+  readonly title: string;
+  readonly body: string;
+  readonly author: string;
+  /** GitHub models a pull request as an issue, so this is how they are told apart. */
+  readonly isPullRequest: boolean;
+}
+
+export interface IssueComment {
+  readonly id: number;
+  readonly author: string;
+  readonly body: string;
+  readonly createdAt: string;
+}
+
 export interface ReviewThread {
   readonly isResolved: boolean;
   readonly isOutdated: boolean;
@@ -353,6 +370,52 @@ export class GitHub {
       log.debug(`Could not compare ${base}...${head}.`, error);
       return undefined;
     }
+  }
+
+  /**
+   * The issue or pull request conversation, whichever this number names.
+   *
+   * `/issues/{n}` answers for both, and a pull request's payload carries a
+   * `pull_request` key that an issue's does not. That key is the only reliable
+   * way to tell them apart, and the mention flow needs to know: a pull request
+   * mention gets the diff as context, an issue mention has no diff to get.
+   */
+  async issue(owner: string, repo: string, number: number): Promise<Issue> {
+    const data = await this.rest<{
+      title: string;
+      body: string | null;
+      user: { login: string } | null;
+      pull_request?: unknown;
+    }>(`/repos/${owner}/${repo}/issues/${number}`);
+
+    return {
+      number,
+      title: data.title,
+      body: data.body ?? '',
+      author: data.user?.login ?? 'unknown',
+      isPullRequest: data.pull_request !== undefined,
+    };
+  }
+
+  /** The conversation timeline: top-level comments, not review threads. */
+  async issueComments(
+    owner: string,
+    repo: string,
+    number: number,
+  ): Promise<readonly IssueComment[]> {
+    const data = await this.paginate<{
+      id: number;
+      body: string | null;
+      created_at: string;
+      user: { login: string } | null;
+    }>(`/repos/${owner}/${repo}/issues/${number}/comments`);
+
+    return data.map((comment) => ({
+      id: comment.id,
+      author: comment.user?.login ?? 'unknown',
+      body: comment.body ?? '',
+      createdAt: comment.created_at,
+    }));
   }
 
   async submitReview(

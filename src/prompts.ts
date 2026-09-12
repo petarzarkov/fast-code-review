@@ -150,3 +150,61 @@ export const replyUserPrompt = (input: ReplyPromptInput): string =>
     '',
     input.thread,
   ].join('\n');
+
+export interface MentionPromptInput {
+  readonly subject: string;
+  readonly kind: 'issue' | 'pull request';
+  readonly conversation: string;
+  readonly diff: string | undefined;
+  readonly language: string | undefined;
+  readonly instructions: string | undefined;
+}
+
+/**
+ * Answering someone who named this bot in a comment.
+ *
+ * Unlike the review prompts, this one has no threshold to enforce and no schema
+ * to satisfy: a person asked a question in prose and wants prose back. What it
+ * does have is a boundary, stated twice because it is the thing a model in this
+ * position most wants to ignore - it can read the pull request and the
+ * conversation, and it cannot read the rest of the repository, run anything, or
+ * change a file. Answering as though it could produces confident instructions
+ * that refer to code it never saw.
+ */
+export const mentionSystemPrompt = (input: MentionPromptInput): string =>
+  [
+    `You were mentioned in a comment on a ${input.kind}. Answer the person who`,
+    'mentioned you.',
+    '',
+    'What you can see is below: the conversation, and for a pull request the',
+    'diff. You cannot read the rest of the repository, run commands, execute',
+    'tests, or change any file. If answering properly needs something outside',
+    'what is shown, say which thing you would need and why, rather than',
+    'guessing at it or describing code you have not read.',
+    '',
+    'Answer what was actually asked. Plain markdown, a few sentences to a few',
+    'short paragraphs. No heading, no preamble naming yourself or the task, no',
+    'signature, no restatement of the question.',
+    '',
+    'If you are asked to make a change, you cannot: say so plainly in one line',
+    'and give the change as a diff or a code block for someone to apply.',
+    '',
+    'If the question shows a previous finding of yours was wrong, say so and',
+    'drop it. Do not defend a position for consistency.',
+    ...(input.language === undefined
+      ? []
+      : ['', `Write the answer in ${input.language}.`]),
+    ...(input.instructions === undefined
+      ? []
+      : ['', 'Repository-specific context:', input.instructions]),
+  ].join('\n');
+
+export const mentionUserPrompt = (input: MentionPromptInput): string =>
+  [
+    `## The ${input.kind}: ${input.subject}`,
+    '',
+    '## Conversation, oldest first',
+    '',
+    input.conversation,
+    ...(input.diff === undefined ? [] : ['', '## The diff', '', input.diff]),
+  ].join('\n');

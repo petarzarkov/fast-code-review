@@ -18,6 +18,8 @@ export interface Config {
   readonly instructions: string | undefined;
   readonly approve: boolean;
   readonly replies: boolean;
+  /** What counts as being addressed. Defaults to the bot's own `@login`. */
+  readonly triggerPhrase: string | undefined;
 }
 
 export const input = (name: string): string =>
@@ -97,5 +99,6 @@ export const loadConfig = (): Config => {
     instructions: optional('instructions'),
     approve: flag('approve', true),
     replies: flag('reply_to_threads', true),
+    triggerPhrase: optional('trigger_phrase'),
   };
 };
