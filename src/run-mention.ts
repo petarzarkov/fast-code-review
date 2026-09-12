@@ -120,7 +120,7 @@ export const runMention = async (
     instructions: config.instructions,
   };
 
-  const answer = await ask(config.attempts, {
+  const answer = await ask(config.answerAttempts, {
     maxTokens: 2_048,
     temperature: 0.3,
     messages: [

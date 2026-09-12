@@ -45,6 +45,29 @@ built in by name; anything else works by setting `<NAME>_BASE_URL`.
 
 </details>
 
+### Fast reviews, careful answers
+
+A review runs on every push and is worth having fast. An answer happens when
+somebody stops to ask, and is worth having right. `answer_routes` splits the
+two, and falls back to `routes` when you do not set it:
+
+```yaml
+  with:
+    routes: |
+      google/gemini-2.5-flash
+      openrouter/nvidia/nemotron-3-super-120b-a12b:free
+    answer_routes: |
+      google/gemini-2.5-pro
+      openrouter/nvidia/nemotron-3-ultra-550b-a55b:free
+      google/gemini-2.5-flash
+```
+
+Worth doing because the failure modes differ. A fast model reviewing a diff has
+the diff in front of it and the schema keeps it honest; the same model asked an
+open question will answer from a premise it invented, at length and with
+confidence, and nothing in the reply says which half was read and which was
+assumed.
+
 ## Keys
 
 Keys come from the job `env`, never from an input — an input would be echoed into
@@ -181,6 +204,7 @@ diff, and an argument costs more of your attention than the finding was worth.
 | Input | Default | |
 | --- | --- | --- |
 | `routes` | three free-tier routes | `<provider>/<model>` per line, best first |
+| `answer_routes` | falls back to `routes` | routes for mentions and replies, where depth beats speed |
 | `github_token` | ambient `GITHUB_TOKEN` | PAT to review as a bot account |
 | `exclude` | lockfiles, `dist/**`, images, snapshots | comma-separated globs; no slash matches the basename |
 | `skip_draft_prs` | `true` | |

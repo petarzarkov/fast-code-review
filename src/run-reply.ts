@@ -113,7 +113,7 @@ export const runReply = async (
     return;
   }
 
-  const answer = await ask(config.attempts, {
+  const answer = await ask(config.answerAttempts, {
     maxTokens: 1_024,
     temperature: 0.3,
     messages: [

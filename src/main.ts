@@ -75,7 +75,8 @@ const main = async (): Promise<void> => {
   const { owner, repo } = repository();
 
   log.info(
-    `Event: ${name}. Routes planned: ${config.attempts.length} attempt(s).`,
+    `Event: ${name}. Review routes: ${config.attempts.length} attempt(s), ` +
+      `answer routes: ${config.answerAttempts.length}.`,
   );
 
   const number = subjectNumber(event);

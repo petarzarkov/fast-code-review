@@ -9,7 +9,21 @@ import { planAttempts, type Attempt } from './routes.ts';
 
 export interface Config {
   readonly token: string;
+  /** Routes for reviewing a diff. */
   readonly attempts: readonly Attempt[];
+  /**
+   * Routes for answering a person: a mention, or a reply in a thread.
+   *
+   * Separate from `attempts` because the two jobs want opposite things. A
+   * review runs on every push and is worth having fast; an answer happens when
+   * somebody stops to ask, and is worth having right. Measured on one
+   * repository, the fastest model reviewed well and then argued a question
+   * from a premise it had invented, which is the failure a slower model was
+   * not making.
+   *
+   * Falls back to `attempts`, so a workflow that does not care sets one list.
+   */
+  readonly answerAttempts: readonly Attempt[];
   readonly exclude: readonly string[];
   readonly skipDrafts: boolean;
   readonly maxComments: number;
@@ -80,9 +94,13 @@ export const loadConfig = (): Config => {
     );
   }
 
+  const attempts = planAttempts(input('routes'));
+  const answerRoutes = input('answer_routes');
+
   return {
     token,
-    attempts: planAttempts(input('routes')),
+    attempts,
+    answerAttempts: answerRoutes === '' ? attempts : planAttempts(answerRoutes),
     exclude: (input('exclude') || DEFAULT_EXCLUDE)
       .split(',')
       .map((pattern) => pattern.trim())

@@ -26,6 +26,17 @@ inputs:
       groq/llama-3.3-70b-versatile
       google/gemini-2.5-flash
 
+  answer_routes:
+    description: >
+      Routes used when answering a person, which is a mention or a reply in a
+      review thread, rather than reviewing a diff. Same syntax as `routes`, and
+      falls back to it when unset.
+
+      Worth setting because the two jobs want opposite things: a review runs on
+      every push and is worth having fast, while an answer happens when someone
+      stops to ask and is worth having right.
+    required: false
+
   github_token:
     description: >
       Token used to read the pull request and post the review. Pass a personal
@@ -105,6 +116,7 @@ runs:
       run: bun run "${{ github.action_path }}/src/main.ts"
       env:
         INPUT_ROUTES: ${{ inputs.routes }}
+        INPUT_ANSWER_ROUTES: ${{ inputs.answer_routes }}
         INPUT_GITHUB_TOKEN: ${{ inputs.github_token }}
         INPUT_EXCLUDE: ${{ inputs.exclude }}
         INPUT_SKIP_DRAFT_PRS: ${{ inputs.skip_draft_prs }}
