@@ -86,6 +86,27 @@ const isQuota = (status: number | undefined, message: string): boolean =>
 const isAuth = (status: number | undefined): boolean =>
   status === 401 || status === 403;
 
+/**
+ * Why an attempt was abandoned, in the words a reader needs.
+ *
+ * 402 is split out from the rest of the quota family on purpose. A 429 is
+ * transient and the route is worth keeping; a 402 is "this account has no plan
+ * for that model" and will still be true tomorrow, so the line has to say
+ * remove it rather than wait for it. Both still derank identically - the
+ * difference is only what the log tells you to do about it.
+ */
+const reasonFor = (status: number | undefined, message: string): string => {
+  if (status === 402 || /payment required|billing/i.test(message)) {
+    return 'needs a paid plan (402); this route will not start working on its own';
+  }
+  if (isQuota(status, message)) return 'out of quota';
+  if (isAuth(status)) return 'key rejected';
+  if (status === 404) {
+    return 'no such model for this key (404); check the id against the provider';
+  }
+  return `failed (${status ?? 'no status'})`;
+};
+
 /** The server's fault, so the same key is worth one more try. */
 const isTransient = (status: number | undefined): boolean =>
   status === undefined || status === 408 || status === 409 || status >= 500;
@@ -210,12 +231,9 @@ export const ask = async (
           continue;
         }
 
-        const why = isQuota(status, failure.message)
-          ? 'out of quota'
-          : isAuth(status)
-            ? 'key rejected'
-            : `failed (${status ?? 'no status'})`;
-        log.info(`${describe(attempt)} ${why}; deranking.`);
+        log.info(
+          `${describe(attempt)} ${reasonFor(status, failure.message)}; deranking.`,
+        );
         log.debug('Reason', failure);
         break;
       }
