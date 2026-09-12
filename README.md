@@ -60,6 +60,11 @@ All three are read and unioned. A route whose provider has no key is skipped wit
 a warning rather than failing the run: the same workflow file gets copied between
 repositories, and the one that only has a Groq key should still review.
 
+`google` and `gemini` are one provider under two names, and either spelling of
+the secret works for either spelling of the route — Google's own docs say
+`GEMINI_API_KEY`, while the route reads better as `google/gemini-2.5-flash`. An
+explicit `GOOGLE_API_KEY` still outranks a `GEMINI_API_KEY`.
+
 ## Setup
 
 ```yaml

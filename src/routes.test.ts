@@ -75,6 +75,21 @@ describe('keysFor', () => {
   test('does not confuse another provider prefixed with the same letters', () => {
     expect(keysFor('open', { OPENROUTER_API_KEY: 'nope' })).toEqual([]);
   });
+
+  test('google finds a GEMINI key, since that is the name Google itself uses', () => {
+    expect(keysFor('google', { GEMINI_API_KEY: 'g' })).toEqual(['g']);
+    expect(keysFor('gemini', { GOOGLE_API_KEY: 'g' })).toEqual(['g']);
+  });
+
+  test('the provider\u2019s own prefix outranks its alias', () => {
+    expect(
+      keysFor('google', { GOOGLE_API_KEY: 'own', GEMINI_API_KEY: 'alias' }),
+    ).toEqual(['own', 'alias']);
+  });
+
+  test('the alias does not leak between unrelated providers', () => {
+    expect(keysFor('groq', { GEMINI_API_KEY: 'g' })).toEqual([]);
+  });
 });
 
 describe('baseUrlFor', () => {

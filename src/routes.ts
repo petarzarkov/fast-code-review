@@ -67,6 +67,40 @@ export const envPrefix = (provider: string): string =>
   provider.toUpperCase().replace(/[^A-Z0-9]+/g, '_');
 
 /**
+ * Other names a provider's key is commonly stored under.
+ *
+ * `google` and `gemini` are one provider with two names, and which one a
+ * repository already has a secret for is not something a route should have to
+ * know. Google's own documentation says `GEMINI_API_KEY`, so that is the name
+ * most existing secrets carry, while the route reads better as `google/...`.
+ * Without this, a `google/gemini-2.5-flash` route next to a `GEMINI_API_KEY`
+ * secret is silently skipped for having no key - which is a misconfiguration
+ * that looks exactly like a working setup until you read the log.
+ */
+const KEY_ALIASES: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  GOOGLE: ['GEMINI'],
+  GEMINI: ['GOOGLE'],
+});
+
+/** The keys stored under one exact prefix, in the order the three spellings give. */
+const keysUnder = (
+  prefix: string,
+  env: Readonly<Record<string, string | undefined>>,
+): readonly (string | undefined)[] => {
+  const numbered = Object.keys(env)
+    .map((name) => new RegExp(`^${prefix}_API_KEY_(\\d+)$`).exec(name))
+    .filter((match): match is RegExpExecArray => match !== null)
+    .sort((a, b) => Number(a[1]) - Number(b[1]))
+    .map((match) => env[match[0]]);
+
+  return [
+    env[`${prefix}_API_KEY`],
+    ...numbered,
+    ...(env[`${prefix}_API_KEYS`] ?? '').split(/[\n,]/),
+  ];
+};
+
+/**
  * Every key configured for a provider, best first.
  *
  * Three spellings, because adding twelve secrets to a repository by hand is the
@@ -75,26 +109,23 @@ export const envPrefix = (provider: string): string =>
  *   `X_API_KEY_1`, `_2`    several keys, one secret each
  *   `X_API_KEYS`           several keys in one secret, comma or newline separated
  *
- * All three are read and concatenated in that order, deduplicated, because a
- * workflow that sets both `GROQ_API_KEY` and `GROQ_API_KEYS` means the union and
- * not an error.
+ * All three are read and concatenated in that order, then the provider's alias
+ * prefixes after them, and the whole lot deduplicated - a workflow that sets
+ * both `GROQ_API_KEY` and `GROQ_API_KEYS` means the union and not an error. The
+ * provider's own prefix comes first so an explicit `GOOGLE_API_KEY` outranks a
+ * `GEMINI_API_KEY` that may be left over from something else.
  */
 export const keysFor = (
   provider: string,
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): readonly string[] => {
   const prefix = envPrefix(provider);
-  const numbered = Object.keys(env)
-    .map((name) => new RegExp(`^${prefix}_API_KEY_(\\d+)$`).exec(name))
-    .filter((match): match is RegExpExecArray => match !== null)
-    .sort((a, b) => Number(a[1]) - Number(b[1]))
-    .map((match) => env[match[0]]);
-
-  const bulk = (env[`${prefix}_API_KEYS`] ?? '').split(/[\n,]/);
+  const prefixes = [prefix, ...(KEY_ALIASES[prefix] ?? [])];
 
   return [
     ...new Set(
-      [env[`${prefix}_API_KEY`], ...numbered, ...bulk]
+      prefixes
+        .flatMap((each) => keysUnder(each, env))
         .map((key) => key?.trim() ?? '')
         .filter((key) => key !== ''),
     ),
@@ -175,7 +206,8 @@ export const planAttempts = (
     const keys = keysFor(provider, env);
     if (keys.length === 0) {
       log.warn(
-        `Ignoring route "${line}": no key. Set ${envPrefix(provider)}_API_KEY.`,
+        `Ignoring route "${line}": no key. Set ${envPrefix(provider)}_API_KEY ` +
+          `(or ${envPrefix(provider)}_API_KEYS for several) in the job env.`,
       );
       continue;
     }
