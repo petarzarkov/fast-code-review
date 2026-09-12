@@ -24,11 +24,9 @@ interface EventPayload {
   readonly comment?: {
     readonly id: number;
     readonly body: string;
-    readonly in_reply_to_id?: number;
     readonly user?: { readonly login: string };
   };
   readonly sender?: { readonly login: string };
-  readonly repository?: { readonly full_name: string };
 }
 
 const readEvent = async (): Promise<EventPayload> => {
@@ -91,7 +89,6 @@ const main = async (): Promise<void> => {
       id: event.comment.id,
       body: event.comment.body,
       sender: event.sender?.login ?? event.comment.user?.login ?? '',
-      inReplyTo: event.comment.in_reply_to_id,
     };
     await runReply(github, config, pr, comment);
     return;

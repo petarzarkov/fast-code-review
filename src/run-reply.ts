@@ -21,7 +21,6 @@ export interface CommentEvent {
   readonly id: number;
   readonly body: string;
   readonly sender: string;
-  readonly inReplyTo: number | undefined;
 }
 
 /** The thread containing a given comment. */
